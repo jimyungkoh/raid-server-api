@@ -1,4 +1,4 @@
 import { PartialType } from '@nestjs/mapped-types';
-import { CreateBossRaidDto } from './create-boss-raid.dto';
+import { EnterBossRaidDto } from './enter-boss-raid.dto';
 
-export class UpdateBossRaidDto extends PartialType(CreateBossRaidDto) {}
+export class UpdateBossRaidDto extends PartialType(EnterBossRaidDto) {}
