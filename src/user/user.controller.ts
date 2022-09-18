@@ -9,6 +9,7 @@ import {
 } from '@nestjs/common';
 import { UserService } from './user.service';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { FindUserDto } from './dto/find-user.dto';
 
 @Controller('user')
 export class UserController {
@@ -19,14 +20,14 @@ export class UserController {
     return this.userService.create();
   }
 
+  @Get(':id')
+  async findOne(@Param('id') id: string) {
+    return new FindUserDto(await this.userService.findOne(+id));
+  }
+
   @Get()
   findAll() {
     return this.userService.findAll();
-  }
-
-  @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.userService.findOne(+id);
   }
 
   @Patch(':id')

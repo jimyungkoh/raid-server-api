@@ -1,4 +1,5 @@
-import { Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
+import { Column, Entity, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
+import { BossRaidHistory } from '../../boss-raid/entities/bossRaidHistory.entity';
 
 @Entity('user')
 export class User {
@@ -7,4 +8,11 @@ export class User {
 
   @Column({ nullable: false, default: 0 })
   totalScore: number;
+
+  @OneToMany(() => BossRaidHistory, (bossRaidHistory) => bossRaidHistory.user, {
+    cascade: true,
+    onDelete: 'CASCADE',
+    onUpdate: 'CASCADE',
+  })
+  bossRaidHistories: BossRaidHistory[];
 }
