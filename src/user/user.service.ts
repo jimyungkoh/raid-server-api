@@ -31,7 +31,7 @@ export class UserService {
     });
 
     if (!user) {
-      throw new NotFoundException();
+      throw new NotFoundException(`user.id '${id}' isn't in the user table.`);
     }
 
     return user;

@@ -1,4 +1,11 @@
-import { Column, Entity, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
+import {
+  Column,
+  CreateDateColumn,
+  Entity,
+  ManyToOne,
+  PrimaryGeneratedColumn,
+  UpdateDateColumn,
+} from 'typeorm';
 import { User } from '../../user/entities/user.entity';
 
 @Entity()
@@ -6,19 +13,21 @@ export class BossRaidHistory {
   @PrimaryGeneratedColumn()
   raidRecordId: number;
 
-  @Column()
+  @Column({ default: 0, nullable: false })
   score: number;
 
-  @Column({
+  @CreateDateColumn({
     type: 'datetime',
+    default: () => 'CURRENT_TIMESTAMP(6)',
   })
   enterTime: Date;
 
-  @Column({
+  @UpdateDateColumn({
     type: 'datetime',
-    nullable: false,
+    default: null,
+    nullable: true,
   })
-  endTime: Date;
+  endTime?: Date = null;
 
   @ManyToOne(() => User, (user) => user.bossRaidHistories, {
     nullable: false,

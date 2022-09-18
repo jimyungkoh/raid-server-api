@@ -12,7 +12,7 @@ export class BossRaidController {
   }
 
   @Post('/enter')
-  create(@Body() enterBossRaidDto: EnterBossRaidDto) {
+  enter(@Body() enterBossRaidDto: EnterBossRaidDto) {
     return this.bossRaidService.enter(enterBossRaidDto);
   }
 }
