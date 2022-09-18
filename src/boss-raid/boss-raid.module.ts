@@ -7,6 +7,7 @@ import { UserService } from '../user/user.service';
 import { User } from '../user/entities/user.entity';
 import { BossRaidController } from './boss-raid.controller';
 import { ConfigModule } from '../config';
+import { BossRaidHistory } from './entities/bossRaidHistory.entity';
 
 @Module({
   controllers: [BossRaidController],
@@ -15,7 +16,7 @@ import { ConfigModule } from '../config';
     HttpModule,
     RedisModule,
     ConfigModule,
-    TypeOrmModule.forFeature([User]),
+    TypeOrmModule.forFeature([User, BossRaidHistory]),
   ],
 })
 export class BossRaidModule {}

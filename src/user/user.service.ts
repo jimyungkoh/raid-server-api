@@ -31,7 +31,7 @@ export class UserService {
     });
 
     if (!user) {
-      throw new NotFoundException();
+      throw new NotFoundException(`user.id '${id}' isn't in the user table.`);
     }
 
     return user;
@@ -43,5 +43,11 @@ export class UserService {
 
   remove(id: number) {
     return `This action removes a #${id} user`;
+  }
+
+  async renewTotalScore(user: User, newScore: number) {
+    user.totalScore += newScore;
+
+    await this.userRepository.save(user);
   }
 }

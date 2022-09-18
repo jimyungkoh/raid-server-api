@@ -1,15 +1,29 @@
-import { Inject, Injectable } from '@nestjs/common';
-import { EnterBossRaidDto } from './dto/enter-boss-raid.dto';
-import { RedisService } from '../database/redis/redis.service';
-import { FindBossRaidStatusDto } from './dto/find-boss-raid-status-dto';
-import { UserService } from '../user/user.service';
+import {
+  BadRequestException,
+  Inject,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
+import { InjectRepository } from '@nestjs/typeorm';
 import { firstValueFrom } from 'rxjs';
 import { ConfigService } from '../config';
+import { RedisService } from '../database/redis/redis.service';
+import { UserService } from '../user/user.service';
+import { BossRaidHistory } from './entities/bossRaidHistory.entity';
+import { Repository } from 'typeorm';
+import {
+  EndBossRaidRequestDto,
+  EnterBossRaidRequestDto,
+  EnterBossRaidResponseDto,
+  FindBossRaidStatusDto,
+} from './dto';
 
 @Injectable()
 export class BossRaidService {
   constructor(
+    @InjectRepository(BossRaidHistory)
+    private bossRaidHistoryRepository: Repository<BossRaidHistory>,
     @Inject(RedisService) private redisService: RedisService,
     @Inject(UserService) private userService: UserService,
     @Inject(HttpService) private readonly httpService: HttpService,
@@ -21,13 +35,13 @@ export class BossRaidService {
    * @returns {Promise<FindBossRaidStatusDto>}
    */
   async findRaidStatus(): Promise<FindBossRaidStatusDto> {
-    const enteredUserId = await this.redisService.get('enteredUserId');
+    const currentRaid = await this.redisService.get('currentRaid');
 
     const raidStatus = new FindBossRaidStatusDto();
 
-    if (!!enteredUserId) {
+    if (!!currentRaid) {
       raidStatus.canEnter = false;
-      raidStatus.enteredUserId = parseInt(enteredUserId);
+      raidStatus.enteredUserId = parseInt(currentRaid.enteredUserId);
     } else {
       delete raidStatus.enteredUserId;
     }
@@ -37,31 +51,93 @@ export class BossRaidService {
 
   /**
    * @description 요구사항 4. 보스레이드 시작
-   * @param {EnterBossRaidDto} enterBossRaidDto
+   * @param {EnterBossRaidRequestDto} enterBossRaidRequestDto
    * @returns {Promise<FindBossRaidStatusDto>}
    */
   async enter(
-    enterBossRaidDto: EnterBossRaidDto
-  ): Promise<FindBossRaidStatusDto> {
-    const user = await this.userService.findOne(enterBossRaidDto.userId);
+    enterBossRaidRequestDto: EnterBossRaidRequestDto
+  ): Promise<EnterBossRaidResponseDto> {
+    const user = await this.userService.findOne(enterBossRaidRequestDto.userId);
 
-    await this.redisService.set('enteredUserId', user.id, { ttl: 180 });
+    const bossRaids = await this.findBossRaids();
 
-    return this.findRaidStatus();
+    const currentRaid = bossRaids.levels[enterBossRaidRequestDto.level];
+
+    if (!currentRaid) {
+      throw new NotFoundException(
+        `level '${enterBossRaidRequestDto.level}' isn't in bossRaids.`
+      );
+    }
+
+    console.log(currentRaid);
+
+    currentRaid.enteredUserId = user.id;
+
+    const timeLimit = bossRaids.bossRaidLimitSeconds;
+
+    const bossRaidHistory = new BossRaidHistory();
+    bossRaidHistory.user = user;
+
+    const newHistory = await this.bossRaidHistoryRepository.save(
+      bossRaidHistory
+    );
+
+    currentRaid.raidRecordId = newHistory.raidRecordId;
+
+    await this.redisService.set('currentRaid', currentRaid, { ttl: timeLimit });
+
+    return new EnterBossRaidResponseDto(newHistory.raidRecordId);
+  }
+
+  async end(endBossRaidRequestDto: EndBossRaidRequestDto) {
+    const user = await this.userService.findOne(endBossRaidRequestDto.userId);
+
+    const raid = await this.bossRaidHistoryRepository.findOneBy({
+      raidRecordId: endBossRaidRequestDto.raidRecordId,
+    });
+
+    if (!raid) {
+      throw new NotFoundException(
+        `raid.raidRecordId '${endBossRaidRequestDto.raidRecordId}' isn't in the raid table.`
+      );
+    }
+
+    const currentRaid = await this.redisService.get('currentRaid');
+
+    if (!currentRaid) {
+      await this.bossRaidHistoryRepository.save(raid);
+      throw new NotFoundException(
+        "currently, there's no raid (timeout or any user entered in the raid)"
+      );
+    }
+
+    if (currentRaid.enteredUserId != user.id) {
+      throw new BadRequestException("enteredUserId doesn't match!");
+    }
+
+    if (currentRaid.raidRecordId !== raid.raidRecordId) {
+      throw new BadRequestException("raidRecordId doesn't match!");
+    }
+
+    raid.score = currentRaid.score;
+
+    raid.endTime = new Date();
+
+    await this.bossRaidHistoryRepository.save(raid);
   }
 
   async findBossRaids() {
-    let bossRaids = await this.redisService.get('bossRaids');
+    let staticData = await this.redisService.get('bossRaids');
 
-    if (!bossRaids) {
+    if (!staticData) {
       const url = this.configService.get('BOSS_RAIDS_URL');
       const { data } = await firstValueFrom(this.httpService.get(url));
 
-      bossRaids = data;
+      staticData = data;
 
-      await this.redisService.set('bossRaids', bossRaids);
+      await this.redisService.set('bossRaids', staticData);
     }
 
-    return bossRaids;
+    return staticData.bossRaids[0];
   }
 }

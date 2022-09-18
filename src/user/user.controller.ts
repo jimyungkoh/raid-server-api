@@ -10,18 +10,19 @@ import {
 import { UserService } from './user.service';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { FindUserDto } from './dto/find-user.dto';
+import { CreateUserDto } from './dto/create-user.dto';
 
 @Controller('user')
 export class UserController {
   constructor(private readonly userService: UserService) {}
 
   @Post()
-  create() {
+  create(): Promise<CreateUserDto | undefined> {
     return this.userService.create();
   }
 
   @Get(':id')
-  async findOne(@Param('id') id: string) {
+  async findOne(@Param('id') id: string): Promise<FindUserDto | undefined> {
     return new FindUserDto(await this.userService.findOne(+id));
   }
 
