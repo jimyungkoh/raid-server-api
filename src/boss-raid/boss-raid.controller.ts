@@ -1,6 +1,6 @@
-import { Controller, Get, Post, Body } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch } from '@nestjs/common';
 import { BossRaidService } from './boss-raid.service';
-import { EnterBossRaidDto } from './dto/enter-boss-raid.dto';
+import { EndBossRaidRequestDto, EnterBossRaidRequestDto } from './dto';
 
 @Controller('boss-raid')
 export class BossRaidController {
@@ -12,7 +12,12 @@ export class BossRaidController {
   }
 
   @Post('/enter')
-  enter(@Body() enterBossRaidDto: EnterBossRaidDto) {
-    return this.bossRaidService.enter(enterBossRaidDto);
+  enter(@Body() enterBossRaidRequestDto: EnterBossRaidRequestDto) {
+    return this.bossRaidService.enter(enterBossRaidRequestDto);
+  }
+
+  @Patch('/end')
+  end(@Body() endBossRaidRequestDto: EndBossRaidRequestDto) {
+    return this.bossRaidService.end(endBossRaidRequestDto);
   }
 }

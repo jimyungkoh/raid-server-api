@@ -44,4 +44,10 @@ export class UserService {
   remove(id: number) {
     return `This action removes a #${id} user`;
   }
+
+  async renewTotalScore(user: User, newScore: number) {
+    user.totalScore += newScore;
+
+    await this.userRepository.save(user);
+  }
 }

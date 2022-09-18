@@ -1,15 +1,23 @@
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { EnterBossRaidDto } from './dto/enter-boss-raid.dto';
-import { RedisService } from '../database/redis/redis.service';
-import { FindBossRaidStatusDto } from './dto/find-boss-raid-status-dto';
-import { UserService } from '../user/user.service';
+import {
+  BadRequestException,
+  Inject,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
+import { InjectRepository } from '@nestjs/typeorm';
 import { firstValueFrom } from 'rxjs';
 import { ConfigService } from '../config';
+import { RedisService } from '../database/redis/redis.service';
+import { UserService } from '../user/user.service';
 import { BossRaidHistory } from './entities/bossRaidHistory.entity';
-import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { EnterBossRaidResultDto } from './dto/enter-boss-raid-result.dto';
+import {
+  EndBossRaidRequestDto,
+  EnterBossRaidRequestDto,
+  EnterBossRaidResponseDto,
+  FindBossRaidStatusDto,
+} from './dto';
 
 @Injectable()
 export class BossRaidService {
@@ -43,29 +51,29 @@ export class BossRaidService {
 
   /**
    * @description 요구사항 4. 보스레이드 시작
-   * @param {EnterBossRaidDto} enterBossRaidDto
+   * @param {EnterBossRaidRequestDto} enterBossRaidRequestDto
    * @returns {Promise<FindBossRaidStatusDto>}
    */
   async enter(
-    enterBossRaidDto: EnterBossRaidDto
-  ): Promise<EnterBossRaidResultDto> {
-    const user = await this.userService.findOne(enterBossRaidDto.userId);
+    enterBossRaidRequestDto: EnterBossRaidRequestDto
+  ): Promise<EnterBossRaidResponseDto> {
+    const user = await this.userService.findOne(enterBossRaidRequestDto.userId);
 
     const bossRaids = await this.findBossRaids();
 
-    const currentRaid = bossRaids.levels[enterBossRaidDto.level];
+    const currentRaid = bossRaids.levels[enterBossRaidRequestDto.level];
 
     if (!currentRaid) {
       throw new NotFoundException(
-        `level '${enterBossRaidDto.level}' isn't in bossRaids.`
+        `level '${enterBossRaidRequestDto.level}' isn't in bossRaids.`
       );
     }
+
+    console.log(currentRaid);
 
     currentRaid.enteredUserId = user.id;
 
     const timeLimit = bossRaids.bossRaidLimitSeconds;
-
-    await this.redisService.set('currentRaid', currentRaid, { ttl: timeLimit });
 
     const bossRaidHistory = new BossRaidHistory();
     bossRaidHistory.user = user;
@@ -74,7 +82,48 @@ export class BossRaidService {
       bossRaidHistory
     );
 
-    return new EnterBossRaidResultDto(newHistory.raidRecordId);
+    currentRaid.raidRecordId = newHistory.raidRecordId;
+
+    await this.redisService.set('currentRaid', currentRaid, { ttl: timeLimit });
+
+    return new EnterBossRaidResponseDto(newHistory.raidRecordId);
+  }
+
+  async end(endBossRaidRequestDto: EndBossRaidRequestDto) {
+    const user = await this.userService.findOne(endBossRaidRequestDto.userId);
+
+    const raid = await this.bossRaidHistoryRepository.findOneBy({
+      raidRecordId: endBossRaidRequestDto.raidRecordId,
+    });
+
+    if (!raid) {
+      throw new NotFoundException(
+        `raid.raidRecordId '${endBossRaidRequestDto.raidRecordId}' isn't in the raid table.`
+      );
+    }
+
+    const currentRaid = await this.redisService.get('currentRaid');
+
+    if (!currentRaid) {
+      await this.bossRaidHistoryRepository.save(raid);
+      throw new NotFoundException(
+        "currently, there's no raid (timeout or any user entered in the raid)"
+      );
+    }
+
+    if (currentRaid.enteredUserId != user.id) {
+      throw new BadRequestException("enteredUserId doesn't match!");
+    }
+
+    if (currentRaid.raidRecordId !== raid.raidRecordId) {
+      throw new BadRequestException("raidRecordId doesn't match!");
+    }
+
+    raid.score = currentRaid.score;
+
+    raid.endTime = new Date();
+
+    await this.bossRaidHistoryRepository.save(raid);
   }
 
   async findBossRaids() {

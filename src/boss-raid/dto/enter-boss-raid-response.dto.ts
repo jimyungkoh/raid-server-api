@@ -1,4 +1,4 @@
-export class EnterBossRaidResultDto {
+export class EnterBossRaidResponseDto {
   constructor(raidRecordId: number) {
     this.raidRecordId = raidRecordId;
   }

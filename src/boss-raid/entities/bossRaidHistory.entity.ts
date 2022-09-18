@@ -24,10 +24,10 @@ export class BossRaidHistory {
 
   @UpdateDateColumn({
     type: 'datetime',
-    default: null,
     nullable: true,
+    default: () => null,
   })
-  endTime?: Date = null;
+  endTime: Date;
 
   @ManyToOne(() => User, (user) => user.bossRaidHistories, {
     nullable: false,

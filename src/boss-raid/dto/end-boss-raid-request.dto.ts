@@ -1,11 +1,11 @@
 import { IsNotEmpty, IsNumber } from 'class-validator';
 
-export class EnterBossRaidDto {
+export class EndBossRaidRequestDto {
   @IsNumber()
   @IsNotEmpty()
-  readonly userId: number;
+  userId: number;
 
   @IsNumber()
   @IsNotEmpty()
-  readonly level: number;
+  raidRecordId: number;
 }
