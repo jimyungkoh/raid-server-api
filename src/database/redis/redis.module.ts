@@ -10,6 +10,7 @@ import { RedisService } from './redis.service';
       useFactory: async (configService: ConfigService) => ({
         store: redisStore,
         host: configService.get('REDIS_HOST'),
+        password: configService.get('REDIS_PASSWORD'),
         port: configService.get('REDIS_PORT'),
         ttl: configService.get('REDIS_TOKEN_EXPIRED_AT'),
       }),

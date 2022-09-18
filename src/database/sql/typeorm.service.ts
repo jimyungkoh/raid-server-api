@@ -17,6 +17,7 @@ export class TypeOrmService implements TypeOrmOptionsFactory {
       database: this.configService.get('DB_NAME'),
       namingStrategy: new SnakeNamingStrategy(),
       entities: [__dirname + '/../../**/**/*.entity{.ts,.js}'],
+      timezone: this.configService.get('DB_TIMEZONE'),
       synchronize: this.configService.isEnv('development'),
       logging: this.configService.isEnv('development'),
     };

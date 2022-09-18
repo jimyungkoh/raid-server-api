@@ -1,12 +1,4 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Body,
-  Patch,
-  Param,
-  Delete,
-} from '@nestjs/common';
+import { Controller, Get, Post, Body } from '@nestjs/common';
 import { BossRaidService } from './boss-raid.service';
 import { EnterBossRaidDto } from './dto/enter-boss-raid.dto';
 
