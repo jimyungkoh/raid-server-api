@@ -18,6 +18,7 @@ import {
   EnterBossRaidResponseDto,
   FindBossRaidStatusDto,
 } from './dto';
+import Message from './boss-raid.message';
 
 @Injectable()
 export class BossRaidService {
@@ -86,43 +87,20 @@ export class BossRaidService {
   }
 
   async end(endBossRaidRequestDto: EndBossRaidRequestDto) {
-    const user = await this.userService.findOne(endBossRaidRequestDto.userId);
+    const currentRaid = await this.redisService.get('currentRaid');
+
+    this.validateCurrentRaid(endBossRaidRequestDto, currentRaid);
 
     const raid = await this.bossRaidHistoryRepository.findOneBy({
       raidRecordId: endBossRaidRequestDto.raidRecordId,
     });
 
-    if (!raid) {
-      throw new NotFoundException(
-        `raid.raidRecordId '${endBossRaidRequestDto.raidRecordId}' isn't in the raid table.`
-      );
-    }
-
-    const currentRaid = await this.redisService.get('currentRaid');
-
-    if (!currentRaid) {
-      await this.bossRaidHistoryRepository.save(raid);
-      throw new NotFoundException(
-        "currently, there's no raid (timeout or any user entered in the raid)"
-      );
-    }
-
-    if (currentRaid.enteredUserId != user.id) {
-      throw new BadRequestException("enteredUserId doesn't match!");
-    }
-
-    if (currentRaid.raidRecordId !== raid.raidRecordId) {
-      throw new BadRequestException("raidRecordId doesn't match!");
-    }
-
     raid.score = currentRaid.score;
-
-    raid.endTime = new Date();
 
     await this.bossRaidHistoryRepository.save(raid);
   }
 
-  async findBossRaids() {
+  private async findBossRaids() {
     let staticData = await this.redisService.get('bossRaids');
 
     if (!staticData) {
@@ -135,5 +113,22 @@ export class BossRaidService {
     }
 
     return staticData.bossRaids[0];
+  }
+
+  private validateCurrentRaid(
+    endBossRaidRequestDto: EndBossRaidRequestDto,
+    currentRaid: any
+  ) {
+    if (!currentRaid) {
+      throw new NotFoundException(Message.NOT_FOUND_CURRENT_RAID);
+    }
+
+    if (currentRaid.enteredUserId !== endBossRaidRequestDto.userId) {
+      throw new BadRequestException(Message.BAD_REQUEST_USER);
+    }
+
+    if (currentRaid.raidRecordId !== endBossRaidRequestDto.raidRecordId) {
+      throw new BadRequestException(Message.BAD_REQUEST_RAID);
+    }
   }
 }
