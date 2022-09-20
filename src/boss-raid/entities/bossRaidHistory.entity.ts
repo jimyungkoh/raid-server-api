@@ -10,6 +10,10 @@ import { User } from '../../user/entities/user.entity';
 
 @Entity()
 export class BossRaidHistory {
+  constructor(user: User) {
+    this.user = user;
+  }
+
   @PrimaryGeneratedColumn()
   raidRecordId: number;
 
