@@ -1,15 +1,17 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { UpdateUserDto } from './dto/update-user.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { User } from './entities/user.entity';
 import { Repository } from 'typeorm';
 import { CreateUserDto } from './dto/create-user.dto';
+import { BossRaidHistory } from '../boss-raid/entities/bossRaidHistory.entity';
 
 @Injectable()
 export class UserService {
   constructor(
     @InjectRepository(User)
-    private userRepository: Repository<User>
+    private userRepository: Repository<User>,
+    @InjectRepository(BossRaidHistory)
+    private bossRaidHistoryRepository: Repository<BossRaidHistory>
   ) {}
 
   async create(): Promise<CreateUserDto | undefined> {
@@ -18,10 +20,6 @@ export class UserService {
     await this.userRepository.save(user);
 
     return new CreateUserDto(user.id);
-  }
-
-  findAll() {
-    return `This action returns all user`;
   }
 
   async findOne(id: number) {
@@ -37,17 +35,26 @@ export class UserService {
     return user;
   }
 
-  update(id: number, updateUserDto: UpdateUserDto) {
-    return `This action updates a #${id} user`;
+  async findTopRankers(): Promise<any> {
+    return await this.userRepository
+      .createQueryBuilder('user')
+      .select('ROW_NUMBER () OVER (ORDER BY "total_score" DESC)', 'ranking')
+      .addSelect('user.id', 'userId')
+      .addSelect('user.totalScore', 'totalScore')
+      .getRawMany();
   }
 
-  remove(id: number) {
-    return `This action removes a #${id} user`;
-  }
+  async renewTotalScore(enteredUserId: number) {
+    const scoreInfo = await this.bossRaidHistoryRepository
+      .createQueryBuilder('bossRaidHistory')
+      .select('SUM(bossRaidHistory.score)', 'totalScore')
+      .where('bossRaidHistory.user_id = :enteredUserId', { enteredUserId })
+      .getRawOne();
 
-  async renewTotalScore(user: User, newScore: number) {
-    user.totalScore += newScore;
+    const user = await this.userRepository.findOneBy({ id: enteredUserId });
 
-    await this.userRepository.save(user);
+    user.totalScore = scoreInfo.totalScore;
+
+    return await this.userRepository.save(user);
   }
 }
