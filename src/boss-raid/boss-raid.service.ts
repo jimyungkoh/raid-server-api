@@ -17,6 +17,7 @@ import {
   EnterBossRaidRequestDto,
   EnterBossRaidResponseDto,
   FindBossRaidStatusDto,
+  TopRankerListRequestDto,
 } from './dto';
 import Message from './boss-raid.message';
 
@@ -50,6 +51,20 @@ export class BossRaidService {
     return raidStatus;
   }
 
+  async findTopRankerList(
+    topRankerListRequestDto: TopRankerListRequestDto
+  ): Promise<any | undefined> {
+    let topRankerList = await this.redisService.get('topRankerList');
+
+    if (!topRankerList) {
+      topRankerList = await this.setTopRankerList();
+    }
+
+    return {
+      topRankerList: topRankerList,
+    };
+  }
+
   /**
    * @description 요구사항 4. 보스레이드 시작
    * @param {EnterBossRaidRequestDto} enterBossRaidRequestDto
@@ -58,6 +73,14 @@ export class BossRaidService {
   async enter(
     enterBossRaidRequestDto: EnterBossRaidRequestDto
   ): Promise<EnterBossRaidResponseDto> {
+    const inUseRaid = await this.redisService.get('currentRaid');
+
+    if (!!inUseRaid) {
+      throw new BadRequestException(
+        Message.BAD_REQUEST_ENTER + inUseRaid.raidRecordId
+      );
+    }
+
     const user = await this.userService.findOne(enterBossRaidRequestDto.userId);
 
     const bossRaids = await this.findBossRaids();
@@ -65,9 +88,7 @@ export class BossRaidService {
 
     // 보스 레이드에 존재하지 않는 level 값이 입력됐다면, NotFoundException
     if (!raidInfo) {
-      throw new NotFoundException(
-        `level '${enterBossRaidRequestDto.level}' isn't in bossRaids.`
-      );
+      throw new NotFoundException(Message.BAD_REQUEST_LEVEL_INPUT);
     }
 
     const currentRaid = await this.bossRaidHistoryRepository.save(
@@ -97,7 +118,12 @@ export class BossRaidService {
 
     raid.score = currentRaid.score;
 
-    await this.bossRaidHistoryRepository.save(raid);
+    await Promise.all([
+      this.bossRaidHistoryRepository.save(raid),
+      this.userService.renewTotalScore(endBossRaidRequestDto.userId),
+      this.setTopRankerList(),
+      this.redisService.del('currentRaid'),
+    ]);
   }
 
   private async findBossRaids() {
@@ -109,7 +135,9 @@ export class BossRaidService {
 
       staticData = data;
 
-      await this.redisService.set('bossRaids', staticData);
+      await this.redisService.set('bossRaids', staticData, { ttl: 0 });
+
+      console.log(staticData.bossRaids[0]);
     }
 
     return staticData.bossRaids[0];
@@ -130,5 +158,25 @@ export class BossRaidService {
     if (currentRaid.raidRecordId !== endBossRaidRequestDto.raidRecordId) {
       throw new BadRequestException(Message.BAD_REQUEST_RAID);
     }
+  }
+
+  private async setTopRankerList(): Promise<any> {
+    const topRankerList = [];
+
+    const topRankers = await this.userService.findTopRankers();
+
+    for (const idx in topRankers) {
+      topRankerList.push({
+        ranking: parseInt(topRankers[idx].ranking) - 1,
+        userId: topRankers[idx].userId,
+        totalScore: topRankers[idx].totalScore,
+      });
+    }
+
+    await this.redisService.set('topRankerList', topRankerList, {
+      ttl: 0,
+    });
+
+    return topRankerList;
   }
 }

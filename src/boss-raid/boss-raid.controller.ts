@@ -1,6 +1,10 @@
 import { Controller, Get, Post, Body, Patch } from '@nestjs/common';
 import { BossRaidService } from './boss-raid.service';
-import { EndBossRaidRequestDto, EnterBossRaidRequestDto } from './dto';
+import {
+  EndBossRaidRequestDto,
+  EnterBossRaidRequestDto,
+  TopRankerListRequestDto,
+} from './dto';
 
 @Controller('boss-raid')
 export class BossRaidController {
@@ -9,6 +13,11 @@ export class BossRaidController {
   @Get('')
   findRaidStatus() {
     return this.bossRaidService.findRaidStatus();
+  }
+
+  @Post('/top-ranker-list')
+  findTopRankerList(@Body() topRankerListDto: TopRankerListRequestDto) {
+    return this.bossRaidService.findTopRankerList(topRankerListDto);
   }
 
   @Post('/enter')
